@@ -1,0 +1,17 @@
+[project]
+name = "digital-library"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Maple", email = "wjxa20152015@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+digital-library = "digital_library:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
