@@ -1,5 +1,5 @@
 import { Signal, useSignal } from "@preact/signals";
-import { jwtToken } from "../signals/auth.ts"; // Import JWT signal
+import { jwtToken } from "../signals/auth.tsx"; // Import JWT signal
 
 interface AddBookFormProps {
   refreshTrigger: Signal<number>;

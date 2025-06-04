@@ -1,4 +1,4 @@
-import { jwtToken, loggedInUsername } from "../signals/auth.ts";
+import { jwtToken, loggedInUsername } from "../signals/auth.tsx";
 
 export default function AuthStatus() {
   function handleLogout() {

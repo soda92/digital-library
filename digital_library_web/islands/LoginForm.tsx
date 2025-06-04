@@ -1,5 +1,5 @@
 import { useSignal } from "@preact/signals";
-import { jwtToken } from "../signals/auth.ts"; // Import the shared signal
+import { jwtToken } from "../signals/auth.tsx"; // Import the shared signal
 
 const API_BASE_URL = "http://127.0.0.1:9000"; // Or pass as prop
 

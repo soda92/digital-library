@@ -1,6 +1,6 @@
 import { Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { jwtToken } from "../signals/auth.ts"; // Import JWT signal
+import { jwtToken } from "../signals/auth.tsx"; // Import JWT signal
 
 // Define the Book type based on your API's BookInDB model
 // Note: API uses integer IDs, so `id` is number.

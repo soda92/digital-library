@@ -5,7 +5,7 @@ import AddBookForm from "../islands/AddBookForm.tsx";
 import LoginForm from "../islands/LoginForm.tsx";
 import RegisterForm from "../islands/RegisterForm.tsx";
 import AuthStatus from "../islands/AuthStatus.tsx";
-import { loggedInUsername } from "../signals/auth.ts"; // Import login state
+import { loggedInUsername } from "../signals/auth.tsx"; // Import login state
 
 // API_BASE_URL will be used for the POST request here, and also within BookList.tsx
 const API_BASE_URL = "http://127.0.0.1:9000";
