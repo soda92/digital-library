@@ -27,7 +27,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.sdist]
 ignore-vcs = true
-packages = ["digital_library", "digital_library_gui", "digital_library_web"]
+packages = [
+    "digital_library_api",
+    "digital_library_rfid",
+    "digital_library_sip2",
+    "digital_library_gui",
+    "digital_library_web",
+]
 exclude = [
     "__pycache__",
     "*.pyc",
@@ -43,8 +49,14 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 ignore-vcs = true
-packages = ["digital_library", "digital_library_gui", "digital_library_web"]
 
+packages = [
+    "digital_library_api",
+    "digital_library_rfid",
+    "digital_library_sip2",
+    "digital_library_gui",
+    "digital_library_web",
+]
 
 [tool.ruff.lint]
 ignore = ['F401', "E701", "E702"]
