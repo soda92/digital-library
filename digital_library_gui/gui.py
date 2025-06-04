@@ -4,7 +4,7 @@ from PySide6 import QtWidgets, QtCore
 # Import specific classes from QtWidgets and QtCore using the module names
 
 from datetime import timedelta, date
-from .database import SessionLocal, Book as DBBook, create_db_tables
+from ..digital_library.database import SessionLocal, Book as DBBook, create_db_tables
 
 # Ensure database tables are created when the app starts
 create_db_tables()
@@ -72,7 +72,9 @@ class LibraryApp(QtWidgets.QMainWindow):
         button_layout.addWidget(self.return_button)
 
         self.refresh_button = QtWidgets.QPushButton("Refresh List")
-        self.refresh_button.clicked.connect(self.load_books) # Connect to existing load_books
+        self.refresh_button.clicked.connect(
+            self.load_books
+        )  # Connect to existing load_books
         button_layout.addWidget(self.refresh_button)
 
         # Book list
@@ -84,7 +86,7 @@ class LibraryApp(QtWidgets.QMainWindow):
         self.layout.addWidget(self.book_list_widget)
 
         self.load_books()
-        self.update_button_states() # Initial state
+        self.update_button_states()  # Initial state
 
     def load_books(self):
         self.book_list_widget.clear()
@@ -101,7 +103,9 @@ class LibraryApp(QtWidgets.QMainWindow):
         isbn = self.isbn_input.text().strip()
 
         if not title or not author or not isbn:
-            QtWidgets.QMessageBox.warning(self, "Input Error", "All fields must be filled.")
+            QtWidgets.QMessageBox.warning(
+                self, "Input Error", "All fields must be filled."
+            )
             return
 
         # Check if ISBN already exists
@@ -146,7 +150,11 @@ class LibraryApp(QtWidgets.QMainWindow):
             return
 
         title, ok1 = QtWidgets.QInputDialog.getText(
-            self, "Edit Book", "Enter new title:", QtWidgets.QLineEdit.Normal, book_to_edit.title
+            self,
+            "Edit Book",
+            "Enter new title:",
+            QtWidgets.QLineEdit.Normal,
+            book_to_edit.title,
         )
         if not ok1:
             return
@@ -162,7 +170,11 @@ class LibraryApp(QtWidgets.QMainWindow):
         # ISBN is usually not editable, but for this demo, we'll allow it.
         # In a real app, you might want to prevent ISBN changes or handle them carefully due to uniqueness.
         isbn, ok3 = QtWidgets.QInputDialog.getText(
-            self, "Edit Book", "Enter new ISBN:", QtWidgets.QLineEdit.Normal, book_to_edit.isbn
+            self,
+            "Edit Book",
+            "Enter new ISBN:",
+            QtWidgets.QLineEdit.Normal,
+            book_to_edit.isbn,
         )
         if not ok3:
             return
@@ -222,7 +234,9 @@ class LibraryApp(QtWidgets.QMainWindow):
                 self.db_session.delete(book_to_delete)
                 self.db_session.commit()
                 self.load_books()
-                QtWidgets.QMessageBox.information(self, "Success", "Book deleted successfully.")
+                QtWidgets.QMessageBox.information(
+                    self, "Success", "Book deleted successfully."
+                )
             else:
                 QtWidgets.QMessageBox.critical(
                     self, "Error", "Book not found in database for deletion."
@@ -237,11 +251,15 @@ class LibraryApp(QtWidgets.QMainWindow):
     def borrow_book(self):
         current_item = self.book_list_widget.currentItem()
         if not current_item:
-            QtWidgets.QMessageBox.warning(self, "Selection Error", "Please select a book to borrow.")
+            QtWidgets.QMessageBox.warning(
+                self, "Selection Error", "Please select a book to borrow."
+            )
             return
 
         book_id = current_item.data(QtCore.Qt.UserRole)
-        book_to_borrow = self.db_session.query(DBBook).filter(DBBook.id == book_id).first()
+        book_to_borrow = (
+            self.db_session.query(DBBook).filter(DBBook.id == book_id).first()
+        )
 
         if not book_to_borrow:
             QtWidgets.QMessageBox.critical(self, "Error", "Book not found in database.")
@@ -249,30 +267,46 @@ class LibraryApp(QtWidgets.QMainWindow):
             return
 
         if book_to_borrow.is_borrowed:
-            QtWidgets.QMessageBox.information(self, "Book Unavailable", f"'{book_to_borrow.title}' is already borrowed by {book_to_borrow.borrower_name}.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "Book Unavailable",
+                f"'{book_to_borrow.title}' is already borrowed by {book_to_borrow.borrower_name}.",
+            )
             return
 
-        borrower_name, ok = QtWidgets.QInputDialog.getText(self, "Borrow Book", "Enter borrower's name:")
+        borrower_name, ok = QtWidgets.QInputDialog.getText(
+            self, "Borrow Book", "Enter borrower's name:"
+        )
         if ok and borrower_name.strip():
             book_to_borrow.is_borrowed = True
             book_to_borrow.borrower_name = borrower_name.strip()
             # Set due date, e.g., 2 weeks from today
             book_to_borrow.due_date = date.today() + timedelta(weeks=2)
-            
+
             self.db_session.commit()
             self.load_books()
-            QtWidgets.QMessageBox.information(self, "Success", f"Book '{book_to_borrow.title}' borrowed by {borrower_name.strip()}.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "Success",
+                f"Book '{book_to_borrow.title}' borrowed by {borrower_name.strip()}.",
+            )
         elif ok and not borrower_name.strip():
-            QtWidgets.QMessageBox.warning(self, "Input Error", "Borrower's name cannot be empty.")
+            QtWidgets.QMessageBox.warning(
+                self, "Input Error", "Borrower's name cannot be empty."
+            )
 
     def return_book(self):
         current_item = self.book_list_widget.currentItem()
         if not current_item:
-            QtWidgets.QMessageBox.warning(self, "Selection Error", "Please select a book to return.")
+            QtWidgets.QMessageBox.warning(
+                self, "Selection Error", "Please select a book to return."
+            )
             return
 
         book_id = current_item.data(QtCore.Qt.UserRole)
-        book_to_return = self.db_session.query(DBBook).filter(DBBook.id == book_id).first()
+        book_to_return = (
+            self.db_session.query(DBBook).filter(DBBook.id == book_id).first()
+        )
 
         if not book_to_return:
             QtWidgets.QMessageBox.critical(self, "Error", "Book not found in database.")
@@ -280,26 +314,36 @@ class LibraryApp(QtWidgets.QMainWindow):
             return
 
         if not book_to_return.is_borrowed:
-            QtWidgets.QMessageBox.information(self, "Book Not Borrowed", f"'{book_to_return.title}' is not currently borrowed.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "Book Not Borrowed",
+                f"'{book_to_return.title}' is not currently borrowed.",
+            )
             return
 
-        reply = QtWidgets.QMessageBox.question(self, "Confirm Return",
-                                     f"Are you sure you want to return '{book_to_return.title}' "
-                                     f"(borrowed by {book_to_return.borrower_name})?",
-                                     QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
-        
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Return",
+            f"Are you sure you want to return '{book_to_return.title}' "
+            f"(borrowed by {book_to_return.borrower_name})?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.No,
+        )
+
         if reply == QtWidgets.QMessageBox.Yes:
             book_to_return.is_borrowed = False
             book_to_return.borrower_name = None
             book_to_return.due_date = None
             self.db_session.commit()
             self.load_books()
-            QtWidgets.QMessageBox.information(self, "Success", f"Book '{book_to_return.title}' returned successfully.")
+            QtWidgets.QMessageBox.information(
+                self, "Success", f"Book '{book_to_return.title}' returned successfully."
+            )
 
     def update_button_states(self):
         current_item = self.book_list_widget.currentItem()
         book_selected = current_item is not None
-        
+
         self.edit_button.setEnabled(book_selected)
         self.delete_button.setEnabled(book_selected)
 
@@ -310,7 +354,7 @@ class LibraryApp(QtWidgets.QMainWindow):
                 self.borrow_button.setEnabled(not book.is_borrowed)
                 self.return_button.setEnabled(book.is_borrowed)
                 return
-        
+
         self.borrow_button.setEnabled(False)
         self.return_button.setEnabled(False)
 
