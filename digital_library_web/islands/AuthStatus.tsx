@@ -10,8 +10,15 @@ export default function AuthStatus() {
       {loggedInUsername.value
         ? (
           <>
-            <p class="text-gray-700">Logged in as: <span class="font-semibold">{loggedInUsername.value}</span></p>
-            <button onClick={handleLogout} class="btn btn-sm btn-outline mt-2">
+            <p class="text-gray-700">
+              Logged in as:{" "}
+              <span class="font-semibold">{loggedInUsername.value}</span>
+            </p>
+            <button
+              type="button"
+              onClick={handleLogout}
+              class="btn btn-sm btn-outline mt-2"
+            >
               Logout
             </button>
           </>
