@@ -1,4 +1,4 @@
-import { Signal, useSignal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { define } from "../utils.ts";
 import BookList from "../islands/BookList.tsx"; // Import the new island
 import AddBookForm from "../islands/AddBookForm.tsx"; // Import the new AddBookForm island
@@ -29,8 +29,7 @@ export default define.page(function Home() {
         {/* Book List */}
         <div class="w-full mt-8">
           <h2 class="text-3xl font-semibold mb-6 text-gray-700">Available Books</h2>
-          {/* Pass API_BASE_URL to BookList as well, as per the comment */}
-          <BookList refreshTrigger={refreshTrigger} API_BASE_URL={API_BASE_URL} />
+          <BookList refreshTrigger={refreshTrigger} />
         </div>
       </div>
     </div>
