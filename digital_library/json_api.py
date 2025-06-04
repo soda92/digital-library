@@ -1,23 +1,24 @@
 # c:\src\digital-library\digital_library\json_api.py
-import asyncio
-import json
 from datetime import date, timedelta, datetime
 from typing import List, Optional, Dict, Any
-from uuid import uuid4, UUID
 
-from fastapi import FastAPI, HTTPException, status, Body
+from fastapi import FastAPI, HTTPException, status, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from sqlalchemy.orm import Session
+
+from .database import SessionLocal, Book as DBBook, create_db_tables
 
 # --- Configuration ---
-JSON_DB_FILE = "books_data.json"
-DB_LOCK = asyncio.Lock()
+# JSON_DB_FILE and DB_LOCK are no longer needed
 
 # --- Pydantic Models ---
+# Pydantic models remain largely the same, but BookInDB.id will change
+
 class BookBase(BaseModel):
     title: str = Field(..., min_length=1)
     author: str = Field(..., min_length=1)
-    isbn: str = Field(..., min_length=10, max_length=13) # Basic ISBN length validation
+    isbn: str = Field(..., min_length=1, max_length=13) # Basic ISBN length validation
     is_borrowed: bool = False
     borrower_name: Optional[str] = None
     due_date: Optional[date] = None
@@ -45,52 +46,30 @@ class BookCreate(BookBase):
     pass
 
 class BookUpdate(BookBase):
-    title: Optional[str] = Field(None, min_length=1)
-    author: Optional[str] = Field(None, min_length=1)
-    isbn: Optional[str] = Field(None, min_length=10, max_length=13)
-    # is_borrowed, borrower_name, due_date can be updated directly
-    # but borrow/return endpoints are preferred for state changes.
+    # All fields are optional for partial updates.
+    # We inherit from BookBase but override fields to be Optional.
+    # A more explicit way is to redefine all fields:
+    # class BookUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1)
+    author: Optional[str] = Field(default=None, min_length=1)
+    isbn: Optional[str] = Field(default=None, min_length=10, max_length=13)
+    is_borrowed: Optional[bool] = Field(default=None)
+    borrower_name: Optional[str] = Field(default=None) # Allow explicit None to clear
+    due_date: Optional[date] = Field(default=None)
 
 class BookInDB(BookBase):
-    id: UUID = Field(...)
+    id: int = Field(...) # Changed from UUID to int
 
-# --- Database Helper Functions ---
-async def load_db() -> Dict[str, Any]:
-    async with DB_LOCK:
-        try:
-            with open(JSON_DB_FILE, "r") as f:
-                try:
-                    data = json.load(f)
-                    # Ensure basic structure
-                    if "books" not in data or "next_id" not in data: # next_id is legacy, using UUID now
-                         data = {"books": {}, "next_id": 1} # books is now a dict keyed by UUID
-                    # Convert date strings back to date objects if necessary
-                    for book_id, book_data in data.get("books", {}).items():
-                        if book_data.get("due_date") and isinstance(book_data["due_date"], str):
-                            try:
-                                book_data["due_date"] = datetime.strptime(book_data["due_date"], "%Y-%m-%d").date()
-                            except ValueError:
-                                book_data["due_date"] = None # or handle error
-                    return data
-                except json.JSONDecodeError:
-                    return {"books": {}, "next_id": 1} # Initialize if file is empty/corrupt
-        except FileNotFoundError:
-            return {"books": {}, "next_id": 1} # Initialize if file doesn't exist
+    class Config:
+        from_attributes = True # Replaces orm_mode = True for Pydantic v2
 
-async def save_db(db_data: Dict[str, Any]):
-    async with DB_LOCK:
-        # Convert date objects to strings for JSON serialization
-        books_to_save = {}
-        for book_id, book_data_dict in db_data.get("books", {}).items():
-            book_copy = book_data_dict.copy()
-            if book_copy.get("due_date") and isinstance(book_copy["due_date"], date):
-                book_copy["due_date"] = book_copy["due_date"].isoformat()
-            books_to_save[book_id] = book_copy
-        
-        data_to_save = {"books": books_to_save, "next_id": db_data.get("next_id", 1)}
-
-        with open(JSON_DB_FILE, "w") as f:
-            json.dump(data_to_save, f, indent=4)
+# --- Database Dependency ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # --- FastAPI App ---
 app = FastAPI(title="Digital Library JSON API", version="0.1.0")
@@ -98,7 +77,7 @@ app = FastAPI(title="Digital Library JSON API", version="0.1.0")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],  # Allows all origins for simplicity, restrict in production
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -106,142 +85,140 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    # You can initialize the DB file here if it doesn't exist or needs setup
-    db = await load_db()
-    if not db.get("books"): # if books dict is empty
-        await save_db({"books": {}, "next_id": 1})
-    print(f"JSON Database API started. Using file: {JSON_DB_FILE}")
+    # Ensure database tables are created
+    create_db_tables()
+    print(f"SQLite Database API started. Using database: {SessionLocal().bind.url}")
 
 # --- API Endpoints ---
 
 @app.post("/books/", response_model=BookInDB, status_code=status.HTTP_201_CREATED)
-async def create_book(book: BookCreate):
-    db = await load_db()
+async def create_book(book: BookCreate, db: Session = Depends(get_db)):
     # Check for ISBN uniqueness
-    for existing_book_data in db["books"].values():
-        if existing_book_data["isbn"] == book.isbn:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Book with ISBN {book.isbn} already exists.",
-            )
+    existing_book = db.query(DBBook).filter(DBBook.isbn == book.isbn).first()
+    if existing_book:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Book with ISBN {book.isbn} already exists.",
+        )
 
-    book_id = uuid4()
-    new_book_data = book.model_dump()
-    new_book_data["id"] = book_id
-    db["books"][str(book_id)] = new_book_data
-    await save_db(db)
-    return BookInDB(**new_book_data)
+    db_book = DBBook(**book.model_dump())
+    db.add(db_book)
+    db.commit()
+    db.refresh(db_book)
+    return db_book
 
 @app.get("/books/", response_model=List[BookInDB])
-async def get_all_books():
-    db = await load_db()
-    return [BookInDB(**book_data) for book_data in db["books"].values()]
+async def get_all_books(db: Session = Depends(get_db)):
+    books = db.query(DBBook).all()
+    return books
 
-@app.get("/books/{book_id}", response_model=BookInDB)
-async def get_book(book_id: UUID):
-    db = await load_db()
-    book_data = db["books"].get(str(book_id))
-    if not book_data:
+@app.get("/books/{book_id}", response_model=BookInDB) # book_id is now int
+async def get_book(book_id: int, db: Session = Depends(get_db)):
+    db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
+    if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-    return BookInDB(**book_data)
+    return db_book
 
-@app.put("/books/{book_id}", response_model=BookInDB)
-async def update_book(book_id: UUID, book_update: BookUpdate):
-    db = await load_db()
-    book_data_dict = db["books"].get(str(book_id))
-    if not book_data_dict:
+@app.put("/books/{book_id}", response_model=BookInDB) # book_id is now int
+async def update_book(book_id: int, book_update: BookUpdate, db: Session = Depends(get_db)):
+    db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
+    if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    update_data = book_update.model_dump(exclude_unset=True)
 
     # Check for ISBN uniqueness if ISBN is being changed
-    if book_update.isbn and book_update.isbn != book_data_dict["isbn"]:
-        for b_id, b_data in db["books"].items():
-            if b_id != str(book_id) and b_data["isbn"] == book_update.isbn:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Another book with ISBN {book_update.isbn} already exists.",
-                )
+    if "isbn" in update_data and update_data["isbn"] != db_book.isbn:
+        existing_book = db.query(DBBook).filter(DBBook.isbn == update_data["isbn"], DBBook.id != book_id).first()
+        if existing_book:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Another book with ISBN {update_data['isbn']} already exists.",
+            )
+
+    # Create a dictionary of the current book state to merge with updates
+    current_book_data = BookInDB.model_validate(db_book).model_dump()
+    proposed_data = current_book_data.copy()
+    proposed_data.update(update_data)
+
+    # If is_borrowed is explicitly set to False in the update, clear borrower details
+    if "is_borrowed" in update_data and update_data["is_borrowed"] is False:
+        proposed_data["borrower_name"] = None
+        proposed_data["due_date"] = None
     
-    update_data = book_update.model_dump(exclude_unset=True)
+    # Validate the entire proposed state using BookBase logic
+    try:
+        validated_for_save = BookBase(**proposed_data)
+    except ValueError as e: # Catches validation errors from BookBase's validator
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    # Apply validated updates to the SQLAlchemy model instance
+    for key, value in validated_for_save.model_dump().items():
+        setattr(db_book, key, value)
     
-    # Validate borrow details if is_borrowed is changing or relevant fields are updated
-    # Pydantic model validation should handle this on BookUpdate instantiation if data is passed correctly
-    # However, we need to ensure consistency if is_borrowed is flipped.
-    if 'is_borrowed' in update_data:
-        if update_data['is_borrowed']:
-            if not update_data.get('borrower_name') or not update_data.get('due_date'):
-                 raise HTTPException(
+    # Specific check: if is_borrowed is true, ensure borrower_name and due_date are set
+    # This should be covered by BookBase validation, but an explicit check after merge is safer
+    if db_book.is_borrowed and (not db_book.borrower_name or not db_book.due_date):
+        raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="If setting is_borrowed to true, borrower_name and due_date are required."
                 )
-        else: # if setting is_borrowed to false
-            update_data['borrower_name'] = None
-            update_data['due_date'] = None
-
-    updated_book_data = {**book_data_dict, **update_data}
     
-    # Re-validate with BookBase to ensure consistency after merge
-    try:
-        BookBase(**updated_book_data) 
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    db.commit()
+    db.refresh(db_book)
+    return db_book
 
-    db["books"][str(book_id)] = updated_book_data
-    await save_db(db)
-    return BookInDB(**updated_book_data)
-
-
-@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_book(book_id: UUID):
-    db = await load_db()
-    if str(book_id) not in db["books"]:
+@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT) # book_id is now int
+async def delete_book(book_id: int, db: Session = Depends(get_db)):
+    db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
+    if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
     
-    del db["books"][str(book_id)]
-    await save_db(db)
+    db.delete(db_book)
+    db.commit()
     return None
 
-@app.post("/books/{book_id}/borrow", response_model=BookInDB)
+@app.post("/books/{book_id}/borrow", response_model=BookInDB) # book_id is now int
 async def borrow_book_action(
-    book_id: UUID, 
+    book_id: int,
     borrower_name: str = Body(..., embed=True, min_length=1),
-    borrow_days: int = Body(14, embed=True, gt=0)
+    borrow_days: int = Body(14, embed=True, gt=0),
+    db: Session = Depends(get_db)
 ):
-    db = await load_db()
-    book_data = db["books"].get(str(book_id))
-    if not book_data:
+    db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
+    if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-    if book_data["is_borrowed"]:
+    if db_book.is_borrowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Book is already borrowed by {book_data['borrower_name']}",
+            detail=f"Book is already borrowed by {db_book.borrower_name}",
         )
 
-    book_data["is_borrowed"] = True
-    book_data["borrower_name"] = borrower_name
-    book_data["due_date"] = date.today() + timedelta(days=borrow_days)
+    db_book.is_borrowed = True
+    db_book.borrower_name = borrower_name
+    db_book.due_date = date.today() + timedelta(days=borrow_days)
     
-    db["books"][str(book_id)] = book_data # Update the entry in the db dict
-    await save_db(db)
-    return BookInDB(**book_data)
+    db.commit()
+    db.refresh(db_book)
+    return db_book
 
-@app.post("/books/{book_id}/return", response_model=BookInDB)
-async def return_book_action(book_id: UUID):
-    db = await load_db()
-    book_data = db["books"].get(str(book_id))
-    if not book_data:
+@app.post("/books/{book_id}/return", response_model=BookInDB) # book_id is now int
+async def return_book_action(book_id: int, db: Session = Depends(get_db)):
+    db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
+    if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-    if not book_data["is_borrowed"]:
+    if not db_book.is_borrowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Book is not currently borrowed"
         )
 
-    book_data["is_borrowed"] = False
-    book_data["borrower_name"] = None
-    book_data["due_date"] = None
+    db_book.is_borrowed = False
+    db_book.borrower_name = None
+    db_book.due_date = None
     
-    db["books"][str(book_id)] = book_data # Update the entry in the db dict
-    await save_db(db)
-    return BookInDB(**book_data)
+    db.commit()
+    db.refresh(db_book)
+    return db_book
 
 # To run this API (save as json_api.py):
 # 1. Install FastAPI and Uvicorn: pip install fastapi uvicorn "pydantic[email]"
