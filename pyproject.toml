@@ -5,10 +5,13 @@ description = "demo digital library application"
 readme = "README.md"
 authors = [{ name = "Maple", email = "wjxa20152015@gmail.com" }]
 requires-python = ">=3.11"
-dependencies = ["pyserial>=3.5"]
+dependencies = ["pyserial>=3.5", "pyside6>=6.9.1", "sqlalchemy>=2.0.41"]
 
 [project.scripts]
 digital-library = "digital_library:main"
+
+[project.gui-scripts]
+digital-library-gui = "digital_library.gui:main_gui"
 
 [build-system]
 requires = ["hatchling"]
