@@ -1,4 +1,5 @@
 import { Signal, useSignal } from "@preact/signals";
+import { jwtToken } from "../signals/auth.ts"; // Import JWT signal
 
 interface AddBookFormProps {
   refreshTrigger: Signal<number>;
@@ -23,12 +24,15 @@ export default function AddBookForm({ refreshTrigger, API_BASE_URL }: AddBookFor
       return;
     }
 
+    if (!jwtToken.value) {
+      addBookFormError.value = "You must be logged in to add a book.";
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/books/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwtToken.value}`},
         body: JSON.stringify({
           title: newBookTitle.value,
           author: newBookAuthor.value,
@@ -38,6 +42,9 @@ export default function AddBookForm({ refreshTrigger, API_BASE_URL }: AddBookFor
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Unauthorized. Please log in again.");
+        }
         const errorData = await response.json().catch(() => ({ detail: `HTTP error! status: ${response.status}` }));
         throw new Error(errorData.detail || `Failed to add book. Status: ${response.status}`);
       }

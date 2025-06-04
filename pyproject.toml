@@ -12,6 +12,7 @@ dependencies = [
     "pyserial>=3.5",
     "pyside6>=6.9.1",
     "python-jose>=3.5.0",
+    "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.41",
     "uvicorn>=0.34.3",
 ]
@@ -20,7 +21,7 @@ dependencies = [
 digital-library = "digital_library:main"
 
 [project.gui-scripts]
-digital-library-gui = "digital_library.gui:main_gui"
+digital-library-gui = "digital_library_gui.gui:main_gui"
 
 [build-system]
 requires = ["hatchling"]

@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
-from passlib.context import PasslibContext
+from passlib.context import CryptContext
 
 from .database import SessionLocal, Book as DBBook, User as DBUser, create_db_tables
 from .models import (
@@ -25,14 +25,14 @@ import os
 
 
 # --- Authentication Configuration ---
-SECRET_KEY = os.getenviron(
+SECRET_KEY = os.environ.get(
     "SECRET_KEY", "YOUR_VERY_SECRET_KEY_CHANGE_THIS"
 )  # IMPORTANT: Change this and keep it secret!
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Password Hashing
-pwd_context = PasslibContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 Scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

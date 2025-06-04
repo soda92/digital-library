@@ -1,7 +1,11 @@
 import { useSignal } from "@preact/signals";
 import { define } from "../utils.ts";
-import BookList from "../islands/BookList.tsx"; // Import the new island
-import AddBookForm from "../islands/AddBookForm.tsx"; // Import the new AddBookForm island
+import BookList from "../islands/BookList.tsx";
+import AddBookForm from "../islands/AddBookForm.tsx";
+import LoginForm from "../islands/LoginForm.tsx";
+import RegisterForm from "../islands/RegisterForm.tsx";
+import AuthStatus from "../islands/AuthStatus.tsx";
+import { loggedInUsername } from "../signals/auth.ts"; // Import login state
 
 // API_BASE_URL will be used for the POST request here, and also within BookList.tsx
 const API_BASE_URL = "http://127.0.0.1:9000";
@@ -23,8 +27,17 @@ export default define.page(function Home() {
         />
         <h1 class="text-4xl font-bold text-gray-800">Digital Library</h1>
 
-        {/* Add Book Form */}
-        <AddBookForm refreshTrigger={refreshTrigger} API_BASE_URL={API_BASE_URL} />
+        <AuthStatus />
+
+        {!loggedInUsername.value && (
+          <div class="w-full md:flex md:space-x-4">
+            <RegisterForm />
+            <LoginForm />
+          </div>
+        )}
+
+        {/* Add Book Form - Show only if logged in */}
+        {loggedInUsername.value && <AddBookForm refreshTrigger={refreshTrigger} API_BASE_URL={API_BASE_URL} />}
 
         {/* Book List */}
         <div class="w-full mt-8">

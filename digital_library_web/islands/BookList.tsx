@@ -1,5 +1,6 @@
 import { Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { jwtToken } from "../signals/auth.ts"; // Import JWT signal
 
 // Define the Book type based on your API's BookInDB model
 // Note: API uses integer IDs, so `id` is number.
@@ -9,7 +10,7 @@ interface Book {
   author: string;
   isbn: string;
   is_borrowed: boolean;
-  borrower_name?: string | null;
+  borrower_username?: string | null; // Changed from borrower_name
   due_date?: string | null; // Dates will be strings from JSON
 }
 
@@ -56,9 +57,9 @@ export default function BookList(props: BookListProps) {
 
   async function handleBorrow(bookId: number, bookTitle: string) {
     actionError.value = null;
-    const borrowerName = prompt(`Enter your name to borrow "${bookTitle}":`);
-    if (!borrowerName || borrowerName.trim() === "") {
-      actionError.value = "Borrower name cannot be empty.";
+    if (!jwtToken.value) {
+      actionError.value = "You must be logged in to borrow a book.";
+      // Optionally, redirect to login or show a more prominent login prompt
       return;
     }
 
@@ -67,11 +68,15 @@ export default function BookList(props: BookListProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${jwtToken.value}`,
         },
-        body: JSON.stringify({ borrower_name: borrowerName.trim() }),
+        body: JSON.stringify({}), // No borrower_name needed, backend uses token
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Unauthorized. Please log in again to borrow.");
+        }
         const errorData = await response.json().catch(() => ({
           detail: `HTTP error! status: ${response.status}`,
         }));
@@ -91,12 +96,20 @@ export default function BookList(props: BookListProps) {
 
   async function handleReturn(bookId: number) {
     actionError.value = null;
+    if (!jwtToken.value) {
+      actionError.value = "You must be logged in to return a book.";
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/books/${bookId}/return`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${jwtToken.value}`,
+        },
       });
 
       if (!response.ok) {
+        if (response.status === 401) throw new Error("Unauthorized. Please log in again to return.");
         const errorData = await response.json().catch(() => ({
           detail: `HTTP error! status: ${response.status}`,
         }));
@@ -141,7 +154,7 @@ export default function BookList(props: BookListProps) {
               <p class="text-sm text-gray-500">ISBN: {book.isbn}</p>
               {book.is_borrowed && (
                 <p class="text-sm text-red-500 mt-1">
-                  Borrowed by: {book.borrower_name || "N/A"} (Due:{" "}
+                  Borrowed by: {book.borrower_username || "N/A"} (Due:{" "}
                   {book.due_date
                     ? new Date(book.due_date).toLocaleDateString()
                     : "N/A"})
