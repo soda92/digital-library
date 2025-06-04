@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 
-from digital_library.database import Book as DBBook
+from digital_library_api.database import Book as DBBook
 
 
 def get_all_books(db_session: Session):

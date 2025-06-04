@@ -1,7 +1,7 @@
 import sys
 from PySide6 import QtWidgets, QtCore
 
-from digital_library.database import SessionLocal, create_db_tables
+from digital_library_api.database import SessionLocal, create_db_tables
 from .ui_setup import setup_main_window_ui
 from .dialogs import prompt_edit_book_details, prompt_borrower_name
 from .book_operations import (get_all_books, get_book_by_id, add_new_book,
