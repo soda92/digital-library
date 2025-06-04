@@ -7,10 +7,12 @@ authors = [{ name = "Maple", email = "wjxa20152015@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.12",
+    "httpx>=0.28.1",
     "passlib[bcrypt]>=1.7.4",
     "pydantic[email]>=2.11.5",
     "pyserial>=3.5",
     "pyside6>=6.9.1",
+    "pytest>=8.4.0",
     "python-jose>=3.5.0",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.41",
