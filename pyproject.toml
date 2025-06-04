@@ -47,4 +47,4 @@ packages = ["digital_library", "digital_library_gui", "digital_library_web"]
 
 
 [tool.ruff.lint]
-ignore = ['F401']
+ignore = ['F401', "E701", "E702"]
