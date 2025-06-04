@@ -4,11 +4,38 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from sqlalchemy.orm import Session
+from jose import JWTError, jwt
+from passlib.context import PasslibContext
 
-from .database import SessionLocal, Book as DBBook, create_db_tables
-from .models import BookBase, BookCreate, BookUpdate, BookInDB
+from .database import SessionLocal, Book as DBBook, User as DBUser, create_db_tables
+from .models import (
+    Token,
+    TokenData,
+    User,
+    UserCreate,
+    BookBase,
+    BookCreate,
+    BookUpdate,
+    BookInDB,
+)
+import os
+
+
+# --- Authentication Configuration ---
+SECRET_KEY = os.getenviron(
+    "SECRET_KEY", "YOUR_VERY_SECRET_KEY_CHANGE_THIS"
+)  # IMPORTANT: Change this and keep it secret!
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Password Hashing
+pwd_context = PasslibContext(schemes=["bcrypt"], deprecated="auto")
+
+# OAuth2 Scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 # --- Database Dependency ---
@@ -18,6 +45,49 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# --- Utility Functions ---
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> DBUser:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(DBUser).filter(DBUser.username == token_data.username).first()
+    if user is None:
+        raise credentials_exception
+    return user
 
 
 # --- FastAPI App ---
@@ -51,9 +121,44 @@ async def lifespan(app: FastAPI):
 app.router.lifespan_context = lifespan
 
 
+# --- User and Authentication Endpoints ---
+@app.post("/users/", response_model=User, status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    hashed_password = get_password_hash(user.password)
+    db_user = DBUser(username=user.username, hashed_password=hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
+    user = db.query(DBUser).filter(DBUser.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @app.post("/books/", response_model=BookInDB, status_code=status.HTTP_201_CREATED)
-async def create_book(book: BookCreate, db: Session = Depends(get_db)):
-    # Check for ISBN uniqueness
+async def create_book(
+    book: BookCreate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user),
+):  # Added current_user for consistency if needed later
     existing_book = db.query(DBBook).filter(DBBook.isbn == book.isbn).first()
     if existing_book:
         raise HTTPException(
@@ -61,17 +166,29 @@ async def create_book(book: BookCreate, db: Session = Depends(get_db)):
             detail=f"Book with ISBN {book.isbn} already exists.",
         )
 
-    db_book = DBBook(**book.model_dump())
+    # Ensure borrower_name is not part of book.model_dump() if BookCreate still had it
+    book_data = book.model_dump(exclude_unset=True)
+    if "borrower_name" in book_data:  # Should not happen if model is updated
+        del book_data["borrower_name"]
+
+    db_book = DBBook(**book_data)
     db.add(db_book)
     db.commit()
     db.refresh(db_book)
-    return db_book
+    return BookInDB.model_validate(db_book)
 
 
 @app.get("/books/", response_model=List[BookInDB])
 async def get_all_books(db: Session = Depends(get_db)):
     books = db.query(DBBook).all()
-    return books
+    # Populate borrower_username
+    result = []
+    for book in books:
+        book_data = BookInDB.model_validate(book).model_dump()
+        if book.borrower:
+            book_data["borrower_username"] = book.borrower.username
+        result.append(BookInDB(**book_data))
+    return result
 
 
 @app.get("/books/{book_id}", response_model=BookInDB)  # book_id is now int
@@ -81,7 +198,10 @@ async def get_book(book_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Book not found"
         )
-    return db_book
+    book_data = BookInDB.model_validate(db_book).model_dump()
+    if db_book.borrower:
+        book_data["borrower_username"] = db_book.borrower.username
+    return BookInDB(**book_data)
 
 
 @app.put("/books/{book_id}", response_model=BookInDB)  # book_id is now int
@@ -109,33 +229,41 @@ async def update_book(
                 detail=f"Another book with ISBN {update_data['isbn']} already exists.",
             )
 
-    # Create a dictionary of the current book state to merge with updates
-    current_book_data = BookInDB.model_validate(db_book).model_dump()
-    proposed_data = current_book_data.copy()
-    proposed_data.update(update_data)
-
-    # If is_borrowed is explicitly set to False in the update, clear borrower details
+    # Handle is_borrowed changes carefully
     if "is_borrowed" in update_data and update_data["is_borrowed"] is False:
-        proposed_data["borrower_name"] = None
-        proposed_data["due_date"] = None
+        # This is effectively a "return" action if the book was borrowed.
+        db_book.is_borrowed = False
+        db_book.borrower_id = None
+        db_book.due_date = None
+        # Remove is_borrowed from update_data so it's not re-applied by the loop
+        del update_data["is_borrowed"]
+        if "due_date" in update_data:  # due_date should be cleared
+            del update_data["due_date"]
 
-    # Validate the entire proposed state using BookBase logic
+    elif "is_borrowed" in update_data and update_data["is_borrowed"] is True:
+        # Disallow borrowing via PUT if the book is not already borrowed by someone else
+        # Or if trying to change borrower. Use /borrow endpoint for that.
+        if not db_book.is_borrowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot borrow book using PUT. Use the /borrow endpoint.",
+            )
+        # If already borrowed, and is_borrowed:true is passed, it's a no-op for borrowing status.
+        # We might still want to update due_date if provided.
+        # For simplicity, we'll let due_date be updated if provided, but is_borrowed status itself is tricky here.
+        # Let's assume if is_borrowed:true is passed and it's already borrowed, we only update other fields.
+        pass  # is_borrowed state remains true, other fields might be updated.
+
+    # Apply other updates
+    for key, value in update_data.items():
+        if hasattr(db_book, key):
+            setattr(db_book, key, value)
+
+    # Validate the final state of the book model before commit (optional, depends on how strict)
     try:
-        validated_for_save = BookBase(**proposed_data)
-    except ValueError as e:  # Catches validation errors from BookBase's validator
+        BookBase.model_validate(db_book)  # Validate against base rules
+    except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    # Apply validated updates to the SQLAlchemy model instance
-    for key, value in validated_for_save.model_dump().items():
-        setattr(db_book, key, value)
-
-    # Specific check: if is_borrowed is true, ensure borrower_name and due_date are set
-    # This should be covered by BookBase validation, but an explicit check after merge is safer
-    if db_book.is_borrowed and (not db_book.borrower_name or not db_book.due_date):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="If setting is_borrowed to true, borrower_name and due_date are required.",
-        )
 
     db.commit()
     db.refresh(db_book)
@@ -160,9 +288,10 @@ async def delete_book(book_id: int, db: Session = Depends(get_db)):
 @app.post("/books/{book_id}/borrow", response_model=BookInDB)  # book_id is now int
 async def borrow_book_action(
     book_id: int,
-    borrower_name: str = Body(..., embed=True, min_length=1),
+    # borrower_name: str = Body(..., embed=True, min_length=1), # Removed
     borrow_days: int = Body(14, embed=True, gt=0),
     db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user),  # Added
 ):
     db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
     if not db_book:
@@ -172,20 +301,26 @@ async def borrow_book_action(
     if db_book.is_borrowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Book is already borrowed by {db_book.borrower_name}",
+            detail=f"Book is already borrowed by {db_book.borrower.username if db_book.borrower else 'another user'}",
         )
 
     db_book.is_borrowed = True
-    db_book.borrower_name = borrower_name
+    db_book.borrower_id = current_user.id  # Use authenticated user's ID
     db_book.due_date = date.today() + timedelta(days=borrow_days)
 
     db.commit()
     db.refresh(db_book)
-    return db_book
+    book_data = BookInDB.model_validate(db_book).model_dump()
+    book_data["borrower_username"] = current_user.username
+    return BookInDB(**book_data)
 
 
 @app.post("/books/{book_id}/return", response_model=BookInDB)  # book_id is now int
-async def return_book_action(book_id: int, db: Session = Depends(get_db)):
+async def return_book_action(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user),
+):
     db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
     if not db_book:
         raise HTTPException(
@@ -196,9 +331,12 @@ async def return_book_action(book_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Book is not currently borrowed",
         )
+    # Optional: Check if the current_user is the one who borrowed it, if strict return policy is needed
+    # if db_book.borrower_id != current_user.id:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You did not borrow this book.")
 
     db_book.is_borrowed = False
-    db_book.borrower_name = None
+    db_book.borrower_id = None  # Clear borrower ID
     db_book.due_date = None
 
     db.commit()
@@ -206,7 +344,7 @@ async def return_book_action(book_id: int, db: Session = Depends(get_db)):
     return db_book
 
 
-# To run this API (save as json_api.py):
+# To run this API:
 # 1. Install FastAPI and Uvicorn: pip install fastapi uvicorn "pydantic[email]"
 # 2. Run with Uvicorn: uvicorn digital_library.json_api:app --reload
 #
