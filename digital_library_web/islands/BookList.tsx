@@ -2,8 +2,9 @@ import { Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
 // Define the Book type based on your API's BookInDB model
+// Note: API uses integer IDs, so `id` is number.
 interface Book {
-  id: string; // UUID is a string
+  id: number;
   title: string;
   author: string;
   isbn: string;
@@ -22,6 +23,7 @@ export default function BookList(props: BookListProps) {
   const books = useSignal<Book[]>([]);
   const isLoadingBooks = useSignal(true);
   const fetchBooksError = useSignal<string | null>(null);
+  const actionError = useSignal<string | null>(null); // For borrow/return errors
 
   async function fetchBooks() {
     isLoadingBooks.value = true;
@@ -52,12 +54,85 @@ export default function BookList(props: BookListProps) {
     fetchBooks();
   }, [props.refreshTrigger.value]); // Re-fetch when refreshTrigger changes
 
+  async function handleBorrow(bookId: number, bookTitle: string) {
+    actionError.value = null;
+    const borrowerName = prompt(`Enter your name to borrow "${bookTitle}":`);
+    if (!borrowerName || borrowerName.trim() === "") {
+      actionError.value = "Borrower name cannot be empty.";
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/books/${bookId}/borrow`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ borrower_name: borrowerName.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          detail: `HTTP error! status: ${response.status}`,
+        }));
+        throw new Error(
+          errorData.detail ||
+            `Failed to borrow book. Status: ${response.status}`,
+        );
+      }
+      props.refreshTrigger.value++; // Refresh book list
+    } catch (error) {
+      console.error("Error borrowing book:", error);
+      actionError.value = error instanceof Error
+        ? error.message
+        : "An unexpected error occurred while borrowing the book.";
+    }
+  }
+
+  async function handleReturn(bookId: number) {
+    actionError.value = null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/books/${bookId}/return`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          detail: `HTTP error! status: ${response.status}`,
+        }));
+        throw new Error(
+          errorData.detail ||
+            `Failed to return book. Status: ${response.status}`,
+        );
+      }
+      props.refreshTrigger.value++; // Refresh book list
+    } catch (error) {
+      console.error("Error returning book:", error);
+      actionError.value = error instanceof Error
+        ? error.message
+        : "An unexpected error occurred while returning the book.";
+    }
+  }
+
   return (
     <>
       {isLoadingBooks.value && <p class="text-gray-600">Loading books...</p>}
-      {fetchBooksError.value && <p class="text-red-500 bg-red-100 p-3 rounded-md">{fetchBooksError.value}</p>}
-      {!isLoadingBooks.value && !fetchBooksError.value && books.value.length === 0 && <p class="text-gray-600">No books in the library yet.</p>}
-      {!isLoadingBooks.value && !fetchBooksError.value && books.value.length > 0 && (
+      {fetchBooksError.value && (
+        <p class="text-red-500 bg-red-100 p-3 rounded-md mb-4">
+          Error loading books: {fetchBooksError.value}
+        </p>
+      )}
+      {actionError.value && (
+        <p class="text-red-500 bg-red-100 p-3 rounded-md mb-4">
+          {actionError.value}
+        </p>
+      )}
+      {!isLoadingBooks.value && !fetchBooksError.value &&
+        books.value.length === 0 && (
+        <p class="text-gray-600">No books in the library yet.</p>
+      )}
+      {!isLoadingBooks.value && !fetchBooksError.value &&
+        books.value.length > 0 && (
         <ul class="space-y-4">
           {books.value.map((book) => (
             <li key={book.id} class="bg-white p-4 rounded-lg shadow">
@@ -66,9 +141,32 @@ export default function BookList(props: BookListProps) {
               <p class="text-sm text-gray-500">ISBN: {book.isbn}</p>
               {book.is_borrowed && (
                 <p class="text-sm text-red-500 mt-1">
-                  Borrowed by: {book.borrower_name || "N/A"} (Due: {book.due_date ? new Date(book.due_date).toLocaleDateString() : "N/A"})
+                  Borrowed by: {book.borrower_name || "N/A"} (Due:{" "}
+                  {book.due_date
+                    ? new Date(book.due_date).toLocaleDateString()
+                    : "N/A"})
                 </p>
               )}
+              <div class="mt-2">
+                {book.is_borrowed
+                  ? (
+                    <button type="button"
+                      onClick={() => handleReturn(book.id)}
+                      class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm focus:outline-none focus:shadow-outline"
+                    >
+                      Return Book
+                    </button>
+                  )
+                  : (
+                    <button
+                      type="button"
+                      onClick={() => handleBorrow(book.id, book.title)}
+                      class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-sm focus:outline-none focus:shadow-outline"
+                    >
+                      Borrow Book
+                    </button>
+                  )}
+              </div>
             </li>
           ))}
         </ul>

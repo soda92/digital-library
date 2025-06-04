@@ -1,6 +1,6 @@
-# c:\src\digital-library\digital_library\json_api.py
 from datetime import date, timedelta, datetime
 from typing import List, Optional, Dict, Any
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,9 +8,6 @@ from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, Book as DBBook, create_db_tables
-
-# --- Configuration ---
-# JSON_DB_FILE and DB_LOCK are no longer needed
 
 # --- Pydantic Models ---
 # Pydantic models remain largely the same, but BookInDB.id will change
@@ -83,14 +80,21 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manages application startup and shutdown events.
+    On startup, it ensures database tables are created.
+    """
     # Ensure database tables are created
     create_db_tables()
     print(f"SQLite Database API started. Using database: {SessionLocal().bind.url}")
+    yield
+    # Add any shutdown logic here if needed in the future
+    print("SQLite Database API shutting down.")
 
 # --- API Endpoints ---
-
+app.router.lifespan_context = lifespan
 @app.post("/books/", response_model=BookInDB, status_code=status.HTTP_201_CREATED)
 async def create_book(book: BookCreate, db: Session = Depends(get_db)):
     # Check for ISBN uniqueness
