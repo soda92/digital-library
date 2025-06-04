@@ -55,7 +55,7 @@ export default function BookList(props: BookListProps) {
     fetchBooks();
   }, [props.refreshTrigger.value]); // Re-fetch when refreshTrigger changes
 
-  async function handleBorrow(bookId: number, bookTitle: string) {
+  async function handleBorrow(bookId: number, _bookTitle: string) {
     actionError.value = null;
     if (!jwtToken.value) {
       actionError.value = "You must be logged in to borrow a book.";
