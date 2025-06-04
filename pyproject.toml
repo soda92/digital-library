@@ -1,13 +1,11 @@
 [project]
 name = "digital-library"
-version = "0.1.0"
-description = "Add your description here"
+version = "2025.6.4.0"
+description = "demo digital library application"
 readme = "README.md"
-authors = [
-    { name = "Maple", email = "wjxa20152015@gmail.com" }
-]
+authors = [{ name = "Maple", email = "wjxa20152015@gmail.com" }]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["pyserial>=3.5"]
 
 [project.scripts]
 digital-library = "digital_library:main"
@@ -15,3 +13,28 @@ digital-library = "digital_library:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+
+[tool.hatch.build.targets.sdist]
+ignore-vcs = true
+packages = ["digital_library"]
+exclude = [
+    "__pycache__",
+    "*.pyc",
+    "compile*.json",
+    ".cache",
+    "build",
+    "*.syso",
+    "*.exe~",
+    "*.ico~",
+    "*.pdb",
+    "*.sqlite3",
+]
+
+[tool.hatch.build.targets.wheel]
+ignore-vcs = true
+packages = ["digital_library"]
+
+
+[tool.ruff.lint]
+ignore = ['F401']
