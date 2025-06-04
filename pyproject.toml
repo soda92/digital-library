@@ -5,7 +5,14 @@ description = "demo digital library application"
 readme = "README.md"
 authors = [{ name = "Maple", email = "wjxa20152015@gmail.com" }]
 requires-python = ">=3.11"
-dependencies = ["pyserial>=3.5", "pyside6>=6.9.1", "sqlalchemy>=2.0.41"]
+dependencies = [
+    "fastapi>=0.115.12",
+    "pydantic[email]>=2.11.5",
+    "pyserial>=3.5",
+    "pyside6>=6.9.1",
+    "sqlalchemy>=2.0.41",
+    "uvicorn>=0.34.3",
+]
 
 [project.scripts]
 digital-library = "digital_library:main"
