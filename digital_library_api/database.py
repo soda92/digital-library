@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Date, ForeignKey
 from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 DATABASE_URL = "sqlite:///./db.sqlite3"
 
@@ -41,5 +41,5 @@ class Book(Base):
         return f"{self.title} by {self.author} (ISBN: {self.isbn}){status}"
 
 # Create database tables
-def create_db_tables():
+def create_db_tables(engine=engine):
     Base.metadata.create_all(bind=engine)

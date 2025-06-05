@@ -16,5 +16,10 @@
   },
   "css.customData": [
     ".vscode/tailwind.json"
-  ]
+  ],
+  "python.testing.pytestArgs": [
+    "digital_library_api"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }
