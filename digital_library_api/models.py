@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
 from datetime import date, timedelta, datetime
 from typing import List, Optional, Dict, Any
 
@@ -58,15 +58,13 @@ class BookInDB(BookBase):
     borrower_id: Optional[int] = None
     borrower_username: Optional[str] = None  # Added to show who borrowed
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class User(UserBase):  # For API response
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
