@@ -206,7 +206,10 @@ async def get_book(book_id: int, db: Session = Depends(get_db)):
 
 @app.put("/books/{book_id}", response_model=BookInDB)  # book_id is now int
 async def update_book(
-    book_id: int, book_update: BookUpdate, db: Session = Depends(get_db)
+    book_id: int,
+    book_update: BookUpdate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user), # <--- ADD THIS
 ):
     db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
     if not db_book:

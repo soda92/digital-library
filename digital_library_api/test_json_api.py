@@ -271,7 +271,7 @@ def test_update_book_success(auth_headers):
     book_id = created_book["id"]
 
     update_payload = {"title": "New Title", "author": "New Author"}
-    response = client.put(f"/books/{book_id}", json=update_payload)
+    response = client.put(f"/books/{book_id}", json=update_payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "New Title"
@@ -279,9 +279,11 @@ def test_update_book_success(auth_headers):
     assert data["isbn"] == created_book["isbn"]  # ISBN not changed
 
 
-def test_update_book_not_found():
+def test_update_book_not_found(auth_headers):
     """Test updating a non-existent book."""
-    response = client.put("/books/99998", json={"title": "Ghost Title"})
+    response = client.put(
+        "/books/99998", json={"title": "Ghost Title"}, headers=auth_headers
+    )
     assert response.status_code == 404
     assert response.json() == {"detail": "Book not found"}
 
@@ -291,7 +293,9 @@ def test_update_book_duplicate_isbn(auth_headers):
     book1 = create_book_via_api_util(auth_headers, isbn="3000000000011")
     book2 = create_book_via_api_util(auth_headers, isbn="3000000000012")
 
-    response = client.put(f"/books/{book2['id']}", json={"isbn": book1["isbn"]})
+    response = client.put(
+        f"/books/{book2['id']}", json={"isbn": book1["isbn"]}, headers=auth_headers
+    )
     assert response.status_code == 400
     assert response.json() == {
         "detail": f"Another book with ISBN {book1['isbn']} already exists."
@@ -309,7 +313,7 @@ def test_update_book_return_action(auth_headers, test_user):
     assert borrow_response.status_code == 200
     assert borrow_response.json()["is_borrowed"] is True
 
-    response = client.put(f"/books/{book_id}", json={"is_borrowed": False})
+    response = client.put(f"/books/{book_id}", json={"is_borrowed": False}, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["is_borrowed"] is False
@@ -324,7 +328,9 @@ def test_update_book_try_borrow_via_put(auth_headers):
     book_id = book_to_borrow["id"]
 
     update_payload = {"is_borrowed": True, "due_date": "2099-01-01"}
-    response = client.put(f"/books/{book_id}", json=update_payload)
+    response = client.put(
+        f"/books/{book_id}", json=update_payload, headers=auth_headers
+    )
     assert response.status_code == 400
     assert response.json() == {
         "detail": "Cannot borrow book using PUT. Use the /borrow endpoint."

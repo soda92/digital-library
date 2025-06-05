@@ -24,6 +24,8 @@ class BookBase(BaseModel):
     # borrower_name: Optional[str] = None # Removed
     due_date: Optional[date] = None
 
+    model_config = ConfigDict(from_attributes=True) # <--- ADD THIS LINE
+
     @field_validator("due_date", mode="before")  # Removed "borrower_name"
     @classmethod
     def check_borrow_details(cls, v: Any, info: ValidationInfo):
