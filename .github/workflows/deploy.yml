@@ -1,0 +1,26 @@
+name: Auto update on server
+
+on:
+  push:
+    tags:
+      - '*' # Trigger on tags like v1.0, v1.0.0, v2.0-beta, etc.
+
+jobs:
+  deploy_on_server:
+    runs-on: ubuntu-latest # Run this job on a Linux runner
+    steps:
+    - name: Deploy on server
+      uses: appleboy/ssh-action@v1.2.2
+      with:
+        host: ${{ secrets.SERVER_IP }}      # Your server's IP address or hostname
+        username: ${{ secrets.SERVER_USERNAME }} # Your SSH username
+        key: ${{ secrets.SERVER_SSH_KEY }}     # Your private SSH key (securely stored as a secret)
+        port: ${{ secrets.SERVER_PORT }}      # SSH port (default is 22)
+        script: |
+          cd ~/digital-library                     # Navigate to your project directory
+          git stash push
+          git pull origin main                  # Pull the latest changes
+          source .venv/bin/activate.fish         # Activate your virtual environment (adjust path if needed)
+          uv sync
+          sudo systemctl restart digital-library-server
+          sudo systemctl restart digital-library-web
