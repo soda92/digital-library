@@ -21,6 +21,7 @@ from .models import (
     BookUpdate,
     BookInDB,
 )
+import uvicorn
 import os
 
 
@@ -347,9 +348,29 @@ async def return_book_action(
     return db_book
 
 
+# --- Main function to run Uvicorn ---
+def main():
+    """Starts the Uvicorn server for the FastAPI application."""
+    uvicorn.run(
+        "digital_library_api.json_api:app",  # Path to the app instance
+        host="127.0.0.1",
+        port=9000,  # Set the port to 9000
+        reload=True,  # Enable auto-reload
+        log_level="info", # Optional: for better logging
+    )
+
+if __name__ == "__main__":
+    # This block allows you to run the API directly using:
+    # python -m digital_library_api.json_api
+    # or if digital_library_api is in PYTHONPATH:
+    # python path/to/json_api.py
+    main()
+
 # To run this API:
 # 1. Install FastAPI and Uvicorn: pip install fastapi uvicorn "pydantic[email]"
-# 2. Run with Uvicorn: uvicorn digital_library.json_api:app --reload
+# 2. Run with Uvicorn: uvicorn digital_library_api.json_api:app --reload --port 9000
+#    OR, if you've added the main function above, you can run:
+#    python -m digital_library_api.json_api  (if your project structure allows this)
 #
-# You can then access the API at http://127.0.0.1:8000
-# And the interactive API docs (Swagger UI) at http://127.0.0.1:8000/docs
+# You can then access the API at http://127.0.0.1:9000
+# And the interactive API docs (Swagger UI) at http://127.0.0.1:9000/docs
