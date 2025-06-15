@@ -1,6 +1,6 @@
 [project]
 name = "digital-library"
-version = "2025.6.14.1"
+version = "2025.6.15.0"
 description = "demo digital library application"
 readme = "README.md"
 authors = [{ name = "Maple", email = "wjxa20152015@gmail.com" }]
