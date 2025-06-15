@@ -42,7 +42,7 @@ export default function LoginForm({ API_BASE_URL }: LoginFormProps) {
 
       const data = await response.json();
       jwtToken.value = data.access_token; // This will trigger the effect in signals/auth.ts
-      if (typeof localStorage !== "undefined") localStorage.setItem("jwt", data.access_token); // Explicitly set for immediate effect
+      // The effect in signals/auth.tsx will handle localStorage persistence.
 
       username.value = ""; // Clear form
       password.value = "";
