@@ -14,7 +14,7 @@ namespace DigitalLibraryWpf.Services
     public class ApiService
     {
         private HttpClient _httpClient;
-        private string _baseApiUrl = "http://localhost:9000/api";
+        private string _baseApiUrl = "http://127.0.0.1:9000/api";
         private string? _authToken;
 
         public event Action? AuthTokenChanged;
@@ -37,7 +37,7 @@ namespace DigitalLibraryWpf.Services
             if (string.IsNullOrWhiteSpace(serverUrl))
             {
                 MessageBox.Show("Server URL cannot be empty.", "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                _baseApiUrl = "http://localhost:9000/api"; // Revert to a safe default
+                _baseApiUrl = "http://127.0.0.1:9000/api"; // Revert to a safe default
             }
             else if (serverUrl.EndsWith("/api"))
             {
@@ -60,7 +60,7 @@ namespace DigitalLibraryWpf.Services
             catch (UriFormatException ex)
             {
                 MessageBox.Show($"Invalid Server URL format: {ex.Message}. Reverting to default.", "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                _baseApiUrl = "http://localhost:9000/api";
+                _baseApiUrl = "http://127.0.0.1:9000/api";
                 _httpClient.BaseAddress = new Uri(_baseApiUrl + "/");
             }
         }

@@ -35,7 +35,7 @@ namespace DigitalLibraryWpf.ViewModels
         
         public string LoginLogoutButtonText => IsLoggedIn ? "Logout" : "Login";
 
-        private string _serverUrl = "http://localhost:9000";
+        private string _serverUrl = "http://127.0.0.1:9000";
         public string ServerUrl
         {
             get => _serverUrl;
