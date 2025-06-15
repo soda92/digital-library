@@ -283,7 +283,11 @@ async def update_book(
 @app.delete(
     "/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT
 )  # book_id is now int
-async def delete_book(book_id: int, db: Session = Depends(get_db)):
+async def delete_book(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user),
+):
     db_book = db.query(DBBook).filter(DBBook.id == book_id).first()
     if not db_book:
         raise HTTPException(

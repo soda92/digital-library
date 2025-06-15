@@ -342,18 +342,28 @@ def test_delete_book_success(auth_headers):
     created_book = create_book_via_api_util(auth_headers, isbn="4000000000001")
     book_id = created_book["id"]
 
-    response = client.delete(f"/books/{book_id}")
+    response = client.delete(f"/books/{book_id}", headers=auth_headers)
     assert response.status_code == 204
 
     get_response = client.get(f"/books/{book_id}")
     assert get_response.status_code == 404
 
 
-def test_delete_book_not_found():
+def test_delete_book_not_found(auth_headers):
     """Test deleting a non-existent book."""
-    response = client.delete("/books/99997")
+    response = client.delete("/books/99997", headers=auth_headers)
     assert response.status_code == 404
     assert response.json() == {"detail": "Book not found"}
+
+def test_delete_book_unauthenticated():
+    """Test deleting a book without authentication."""
+    # We don't need to create a book, as it should fail before checking existence.
+    # However, to be robust, let's assume a book ID that might exist if not for auth.
+    book_id = 1 # A hypothetical book ID
+
+    response = client.delete(f"/books/{book_id}") # No headers
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Not authenticated"}
 
 
 # --- Borrow and Return Endpoint Tests ---
