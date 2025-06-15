@@ -8,7 +8,7 @@ namespace DigitalLibraryWpf
         {
             InitializeComponent();
             // DataContext is set in XAML, but could also be set here:
-             this.DataContext = new ViewModels.MainViewModel();
+            //  this.DataContext = new ViewModels.MainViewModel();
         }
     }
 }

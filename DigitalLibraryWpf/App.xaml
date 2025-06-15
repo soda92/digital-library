@@ -2,8 +2,15 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:DigitalLibraryWpf"
+             xmlns:views="clr-namespace:DigitalLibraryWpf.Views"
+             xmlns:viewModels="clr-namespace:DigitalLibraryWpf.ViewModels"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <DataTemplate DataType="{x:Type viewModels:LoginViewModel}">
+            <views:LoginView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModels:BookManagementViewModel}">
+            <views:BookManagementView/>
+        </DataTemplate>
     </Application.Resources>
 </Application>

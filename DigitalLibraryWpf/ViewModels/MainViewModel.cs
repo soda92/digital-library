@@ -1,53 +1,41 @@
-using DigitalLibraryWpf.Models;
 using DigitalLibraryWpf.Services;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Input;
+using System.Windows; // For Application.Current.Dispatcher
 
 namespace DigitalLibraryWpf.ViewModels
 {
     public class MainViewModel : BaseViewModel
     {
         private readonly ApiService _apiService;
+        private LoginViewModel _loginViewModel;
+        private BookManagementViewModel _bookManagementViewModel;
 
-        private ObservableCollection<Book> _books = new ObservableCollection<Book>();
-        public ObservableCollection<Book> Books
+        private BaseViewModel _currentPageViewModel;
+        public BaseViewModel CurrentPageViewModel
         {
-            get => _books;
-            set => SetField(ref _books, value);
+            get => _currentPageViewModel;
+            set => SetField(ref _currentPageViewModel, value);
         }
 
-        private Book? _selectedBook;
-        public Book? SelectedBook
+        private bool _isLoggedIn;
+        public bool IsLoggedIn
         {
-            get => _selectedBook;
-            set => SetField(ref _selectedBook, value);
-        }
-
-        // Properties for new book creation
-        private string _newBookTitle = string.Empty;
-        public string NewBookTitle
-        {
-            get => _newBookTitle;
-            set => SetField(ref _newBookTitle, value);
-        }
-
-        private string _newBookAuthor = string.Empty;
-        public string NewBookAuthor
-        {
-            get => _newBookAuthor;
-            set => SetField(ref _newBookAuthor, value);
-        }
-
-        private string _newBookIsbn = string.Empty;
-        public string NewBookIsbn
-        {
-            get => _newBookIsbn;
-            set => SetField(ref _newBookIsbn, value);
+            get => _isLoggedIn;
+            set
+            {
+                if (SetField(ref _isLoggedIn, value))
+                {
+                    OnPropertyChanged(nameof(LoginLogoutButtonText));
+                    // Re-evaluate commands that depend on login state
+                    CommandManager.InvalidateRequerySuggested();
+                }
+            }
         }
         
-        private string _serverUrl = "http://localhost:9000"; // User inputs this
+        public string LoginLogoutButtonText => IsLoggedIn ? "Logout" : "Login";
+
+        private string _serverUrl = "http://localhost:9000";
         public string ServerUrl
         {
             get => _serverUrl;
@@ -55,122 +43,76 @@ namespace DigitalLibraryWpf.ViewModels
             {
                 if (SetField(ref _serverUrl, value))
                 {
-                    _apiService.SetBaseUrl(_serverUrl); // Update ApiService when URL changes
+                    // Apply immediately or via button
+                    // _apiService.SetBaseUrl(_serverUrl); 
                 }
             }
         }
 
-        private string _authToken = string.Empty;
-        public string AuthToken
-        {
-            get => _authToken;
-            set
-            {
-                if(SetField(ref _authToken, value))
-                {
-                    _apiService.SetAuthToken(_authToken);
-                }
-            }
-        }
-
-
-        public ICommand LoadBooksCommand { get; }
-        public ICommand AddBookCommand { get; }
-        public ICommand DeleteBookCommand { get; }
         public ICommand ApplyServerUrlCommand { get; }
-
+        public ICommand LogoutCommand { get; }
+        public ICommand LoginCommand { get; } // Will navigate to login view if not already there
 
         public MainViewModel()
         {
             _apiService = new ApiService();
             _apiService.SetBaseUrl(ServerUrl); // Initialize with default URL
-            _apiService.SetAuthToken(AuthToken); // Initialize with empty/default token
+            _apiService.AuthTokenChanged += OnAuthTokenChanged; // Subscribe to token changes
 
-            LoadBooksCommand = new RelayCommand(async _ => await LoadBooksAsync());
-            AddBookCommand = new RelayCommand(async _ => await AddBookAsync(), _ => CanAddBook());
-            DeleteBookCommand = new RelayCommand(async _ => await DeleteBookAsync(), _ => SelectedBook != null);
-            ApplyServerUrlCommand = new RelayCommand(_ => _apiService.SetBaseUrl(ServerUrl));
-
-
-            // Load books on startup (optional)
-            // Task.Run(async () => await LoadBooksAsync());
-        }
-
-        private async Task LoadBooksAsync()
-        {
-            var booksList = await _apiService.GetBooksAsync();
-            if (booksList != null)
-            {
-                Application.Current.Dispatcher.Invoke(() => // Ensure UI updates on UI thread
-                {
-                    Books.Clear();
-                    foreach (var book in booksList)
-                    {
-                        Books.Add(book);
-                    }
-                });
-            }
-        }
-
-        private bool CanAddBook()
-        {
-            return !string.IsNullOrWhiteSpace(NewBookTitle) &&
-                   !string.IsNullOrWhiteSpace(NewBookAuthor) &&
-                   !string.IsNullOrWhiteSpace(NewBookIsbn);
-        }
-
-        private async Task AddBookAsync()
-        {
-            if (string.IsNullOrEmpty(AuthToken))
-            {
-                MessageBox.Show("Auth Token is required to add a book. Please enter it in the settings.", "Authentication Required", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            var newBookDto = new BookCreateDto
-            {
-                Title = NewBookTitle,
-                Author = NewBookAuthor,
-                Isbn = NewBookIsbn
-            };
-
-            var createdBook = await _apiService.CreateBookAsync(newBookDto);
-            if (createdBook != null)
-            {
-                Application.Current.Dispatcher.Invoke(() => Books.Add(createdBook));
-                NewBookTitle = string.Empty;
-                NewBookAuthor = string.Empty;
-                NewBookIsbn = string.Empty;
-                MessageBox.Show("Book added successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            else
-            {
-                // Error message already shown by ApiService
-            }
-        }
-
-        private async Task DeleteBookAsync()
-        {
-            if (SelectedBook == null) return;
-
-            // Optional: Confirm before deleting
-            var result = MessageBox.Show($"Are you sure you want to delete '{SelectedBook.Title}'?",
-                                         "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.No) return;
+            _loginViewModel = new LoginViewModel(_apiService, OnLoginSuccess);
+            _bookManagementViewModel = new BookManagementViewModel(_apiService);
             
-            // Note: The current FastAPI delete_book endpoint does not require authentication.
-            // If it did, and AuthToken was empty, you might add a check here similar to AddBookAsync.
+            ApplyServerUrlCommand = new RelayCommand(_ => _apiService.SetBaseUrl(ServerUrl), _ => !string.IsNullOrWhiteSpace(ServerUrl));
+            LogoutCommand = new RelayCommand(ExecuteLogout, () => IsLoggedIn);
+            LoginCommand = new RelayCommand(ExecuteShowLogin, () => !IsLoggedIn);
 
-            bool success = await _apiService.DeleteBookAsync(SelectedBook.Id);
-            if (success)
+
+            // Initial state
+            IsLoggedIn = _apiService.IsUserLoggedIn; // Check if already logged in (e.g. token persistence later)
+            if (IsLoggedIn)
             {
-                Application.Current.Dispatcher.Invoke(() => Books.Remove(SelectedBook));
-                SelectedBook = null;
-                MessageBox.Show("Book deleted successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                CurrentPageViewModel = _bookManagementViewModel;
+                // If starting logged in, ensure books are loaded
+                Task.Run(async () => await _bookManagementViewModel.LoadBooksAsync());
             }
             else
             {
-                 // Error message already shown by ApiService
+                CurrentPageViewModel = _loginViewModel;
+            }
+        }
+
+        private void OnAuthTokenChanged()
+        {
+            // Update IsLoggedIn property which will trigger UI updates
+            // Ensure this is run on the UI thread if it modifies UI-bound properties directly
+            // or if ApiService calls it from a non-UI thread.
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                IsLoggedIn = _apiService.IsUserLoggedIn;
+            });
+        }
+
+        private void OnLoginSuccess()
+        {
+            IsLoggedIn = true;
+            CurrentPageViewModel = _bookManagementViewModel;
+            // Trigger book loading after successful login
+            Task.Run(async () => await _bookManagementViewModel.LoadBooksAsync());
+        }
+
+        private void ExecuteLogout(object? parameter)
+        {
+            _apiService.Logout();
+            IsLoggedIn = false; // This should also be set by OnAuthTokenChanged
+            CurrentPageViewModel = _loginViewModel;
+            _bookManagementViewModel.Books.Clear(); // Clear books on logout
+        }
+        
+        private void ExecuteShowLogin(object? parameter)
+        {
+            if (!IsLoggedIn) // Should always be true due to CanExecute
+            {
+                 CurrentPageViewModel = _loginViewModel;
             }
         }
     }

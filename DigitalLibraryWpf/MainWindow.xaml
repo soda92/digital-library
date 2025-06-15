@@ -6,133 +6,87 @@
         xmlns:local="clr-namespace:DigitalLibraryWpf"
         xmlns:viewModels="clr-namespace:DigitalLibraryWpf.ViewModels"
         mc:Ignorable="d"
-        Title="Digital Library Client" Height="600" Width="800">
+        Title="Digital Library Client" Height="650" Width="850" MinHeight="500" MinWidth="600">
+    <Window.DataContext>
+        <viewModels:MainViewModel/>
+    </Window.DataContext>
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/> <!-- Configuration and Login/Logout -->
+            <RowDefinition Height="*"/>    <!-- Main Content Area -->
+            <RowDefinition Height="Auto"/> <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <!-- Server Configuration -->
-        <GroupBox Header="API Configuration" Grid.Row="0" Margin="0,0,0,10">
+        <!-- Top Bar: Server Configuration and Login/Logout -->
+        <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5" Margin="0,0,0,10">
             <StackPanel Orientation="Vertical">
-                <StackPanel Orientation="Horizontal" Margin="5">
-                    <TextBlock Text="Server URL (e.g., http://localhost:9000):" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <TextBox Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" Width="250" Margin="0,0,5,0"/>
-                    <Button Content="Apply URL" Command="{Binding ApplyServerUrlCommand}" Padding="5"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="5">
-                    <TextBlock Text="Auth Token (Bearer):" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <TextBox Text="{Binding AuthToken, UpdateSourceTrigger=PropertyChanged}" Width="300"/>
-                </StackPanel>
+                <GroupBox Header="API Configuration">
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <TextBlock Text="Server URL (e.g., http://localhost:9000):" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" Width="250" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <Button Content="Apply URL" Command="{Binding ApplyServerUrlCommand}" Padding="5" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                        
+                        <Button Content="{Binding LoginLogoutButtonText}" 
+                                Command="{Binding Path=IsLoggedIn, Converter={StaticResource BooleanToCommandConverter}, ConverterParameter={StaticResource LoginLogoutCommands}}"
+                                Padding="10,5" VerticalAlignment="Center" MinWidth="80"/>
+                        <!-- The BooleanToCommandConverter and LoginLogoutCommands would be more complex.
+                             Simpler approach: Two buttons with visibility binding, or one button whose command changes.
+                             For simplicity, let's use two buttons with visibility.
+                        -->
+                    </StackPanel>
+                </GroupBox>
+                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,5,0">
+                     <Button Content="Login" Command="{Binding LoginCommand}" Padding="10,5" Margin="0,0,5,0">
+                         <Button.Style>
+                             <Style TargetType="Button">
+                                 <Setter Property="Visibility" Value="Collapsed"/>
+                                 <Style.Triggers>
+                                     <DataTrigger Binding="{Binding IsLoggedIn}" Value="False">
+                                         <Setter Property="Visibility" Value="Visible"/>
+                                     </DataTrigger>
+                                 </Style.Triggers>
+                             </Style>
+                         </Button.Style>
+                     </Button>
+                     <Button Content="Logout" Command="{Binding LogoutCommand}" Padding="10,5">
+                         <Button.Style>
+                             <Style TargetType="Button">
+                                 <Setter Property="Visibility" Value="Collapsed"/>
+                                 <Style.Triggers>
+                                     <DataTrigger Binding="{Binding IsLoggedIn}" Value="True">
+                                         <Setter Property="Visibility" Value="Visible"/>
+                                     </DataTrigger>
+                                 </Style.Triggers>
+                             </Style>
+                         </Button.Style>
+                     </Button>
+                 </StackPanel>
             </StackPanel>
-        </GroupBox>
+        </Border>
         
-        <!-- Add Book Form -->
-        <GroupBox Header="Add New Book" Grid.Row="1" Margin="0,0,0,10">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+        <!-- Main Content Area -->
+        <ContentControl Grid.Row="1" Content="{Binding CurrentPageViewModel}" Margin="0,5,0,5"/>
 
-                    <TextBlock Grid.Column="0" Text="Title:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="1" Text="{Binding NewBookTitle, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-
-                    <TextBlock Grid.Column="2" Text="Author:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="3" Text="{Binding NewBookAuthor, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-
-                    <TextBlock Grid.Column="4" Text="ISBN:" VerticalAlignment="Center" Margin="5"/>
-                    <TextBox Grid.Column="5" Text="{Binding NewBookIsbn, UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
-                    
-                    <Button Grid.Column="6" Content="Add Book" Command="{Binding AddBookCommand}" Margin="5" Padding="10,5"/>
-                </Grid>
-            </StackPanel>
-        </GroupBox>
-
-        <!-- Books List -->
-        <GroupBox Header="Available Books" Grid.Row="2">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <ListView ItemsSource="{Binding Books}" SelectedItem="{Binding SelectedBook}" Grid.Row="0" Margin="5" AlternationCount="2">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
+        <!-- Status Bar (Optional) -->
+        <StatusBar Grid.Row="2">
+            <StatusBarItem>
+                <TextBlock>
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="Not logged in."/>
                             <Style.Triggers>
-                                <Trigger Property="ItemsControl.AlternationIndex" Value="0">
-                                    <Setter Property="Background" Value="WhiteSmoke"></Setter>
-                                </Trigger>
-                                <Trigger Property="ItemsControl.AlternationIndex" Value="1">
-                                    <Setter Property="Background" Value="LightGray"></Setter>
-                                </Trigger>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="CornflowerBlue"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                </Trigger>
+                                <DataTrigger Binding="{Binding IsLoggedIn}" Value="True">
+                                    <Setter Property="Text" Value="Logged In"/>
+                                </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" Width="50"/>
-                            <GridViewColumn Header="Title" DisplayMemberBinding="{Binding Title}" Width="200"/>
-                            <GridViewColumn Header="Author" DisplayMemberBinding="{Binding Author}" Width="150"/>
-                            <GridViewColumn Header="ISBN" DisplayMemberBinding="{Binding Isbn}" Width="120"/>
-                            <GridViewColumn Header="Status" Width="250">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock>
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="Available"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsBorrowed}" Value="True">
-                                                            <Setter Property="Text" Value="{Binding ConverterParameter='Borrowed by {0}, Due: {1}', Converter={StaticResource BookStatusConverter}}"/>
-                                                            <Setter Property="Text">
-                                                                <Setter.Value>
-                                                                    <MultiBinding StringFormat="Borrowed by {0}, Due: {1}">
-                                                                        <Binding Path="BorrowerUsername" FallbackValue="N/A"/>
-                                                                        <Binding Path="DueDate" StringFormat='{}{0:yyyy-MM-dd}' FallbackValue="N/A"/>
-                                                                    </MultiBinding>
-                                                                </Setter.Value>
-                                                            </Setter>
-                                                            <Setter Property="Foreground" Value="OrangeRed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
-                    <Button Content="Refresh Books" Command="{Binding LoadBooksCommand}" Margin="0,0,5,0" Padding="10,5"/>
-                    <Button Content="Delete Selected Book" Command="{Binding DeleteBookCommand}" Padding="10,5"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-        
-        <!-- Status Bar (Optional) -->
-        <!--<StatusBar Grid.Row="3">
-            <StatusBarItem>
-                <TextBlock Text="{Binding Books.Count, StringFormat='{0} books loaded.'}"/>
+                    </TextBlock.Style>
+                </TextBlock>
             </StatusBarItem>
-        </StatusBar>-->
+            <Separator/>
+            <StatusBarItem>
+                 <TextBlock Text="{Binding ServerUrl, StringFormat='API: {0}'}"/>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
