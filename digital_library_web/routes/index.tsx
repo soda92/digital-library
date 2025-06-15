@@ -7,13 +7,13 @@ import RegisterForm from "../islands/RegisterForm.tsx";
 import AuthStatus from "../islands/AuthStatus.tsx";
 import { loggedInUsername } from "../signals/auth.tsx"; // Import login state
 
-// API_BASE_URL will be used for the POST request here, and also within BookList.tsx
-const API_BASE_URL = "http://127.0.0.1:9000";
-
 export default define.page(function Home() {
   // Signal to trigger refresh in BookList island
   // This signal will now also be used by AddBookForm to trigger BookList
   const refreshTrigger = useSignal(0);
+
+  // Read API_BASE_URL from environment variable, with a fallback for local dev
+  const apiBaseUrl = Deno.env.get("API_BASE_URL") || "http://127.0.0.1:9000";
 
   return (
     <div class="px-4 py-8 mx-auto bg-gray-100 min-h-screen font-sans">
@@ -31,18 +31,18 @@ export default define.page(function Home() {
 
         {!loggedInUsername.value && (
           <div class="w-full md:flex md:space-x-4">
-            <RegisterForm />
-            <LoginForm />
+            <RegisterForm API_BASE_URL={apiBaseUrl} />
+            <LoginForm API_BASE_URL={apiBaseUrl} />
           </div>
         )}
 
         {/* Add Book Form - Show only if logged in */}
-        {loggedInUsername.value && <AddBookForm refreshTrigger={refreshTrigger} API_BASE_URL={API_BASE_URL} />}
+        {loggedInUsername.value && <AddBookForm refreshTrigger={refreshTrigger} API_BASE_URL={apiBaseUrl} />}
 
         {/* Book List */}
         <div class="w-full mt-8">
           <h2 class="text-3xl font-semibold mb-6 text-gray-700">Available Books</h2>
-          <BookList refreshTrigger={refreshTrigger} />
+          <BookList refreshTrigger={refreshTrigger} API_BASE_URL={apiBaseUrl} />
         </div>
       </div>
     </div>

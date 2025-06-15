@@ -1,8 +1,11 @@
 import { useSignal } from "@preact/signals";
 
-const API_BASE_URL = "http://127.0.0.1:9000"; // Or pass as prop
+interface RegisterFormProps {
+  API_BASE_URL: string;
+}
 
-export default function RegisterForm() {
+export default function RegisterForm({ API_BASE_URL }: RegisterFormProps) {
+  // API_BASE_URL is now passed as a prop
   const username = useSignal("");
   const password = useSignal("");
   const error = useSignal<string | null>(null);

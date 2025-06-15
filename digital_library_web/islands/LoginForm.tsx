@@ -1,13 +1,17 @@
 import { useSignal } from "@preact/signals";
 import { jwtToken } from "../signals/auth.tsx"; // Import the shared signal
 
-const API_BASE_URL = "http://127.0.0.1:9000"; // Or pass as prop
+interface LoginFormProps {
+  API_BASE_URL: string;
+}
 
-export default function LoginForm() {
+export default function LoginForm({ API_BASE_URL }: LoginFormProps) {
   const username = useSignal("");
   const password = useSignal("");
   const error = useSignal<string | null>(null);
   const isLoading = useSignal(false);
+
+  // API_BASE_URL is now passed as a prop
 
   async function handleLogin(e: Event) {
     e.preventDefault();

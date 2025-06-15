@@ -14,13 +14,12 @@ interface Book {
   due_date?: string | null; // Dates will be strings from JSON
 }
 
-const API_BASE_URL = "http://127.0.0.1:9000";
-
 interface BookListProps {
   refreshTrigger: Signal<number>;
+  API_BASE_URL: string;
 }
 
-export default function BookList(props: BookListProps) {
+export default function BookList({ refreshTrigger, API_BASE_URL }: BookListProps) {
   const books = useSignal<Book[]>([]);
   const isLoadingBooks = useSignal(true);
   const fetchBooksError = useSignal<string | null>(null);
@@ -53,7 +52,7 @@ export default function BookList(props: BookListProps) {
 
   useEffect(() => {
     fetchBooks();
-  }, [props.refreshTrigger.value]); // Re-fetch when refreshTrigger changes
+  }, [refreshTrigger.value]); // Re-fetch when refreshTrigger changes
 
   async function handleBorrow(bookId: number, _bookTitle: string) {
     actionError.value = null;
@@ -85,7 +84,7 @@ export default function BookList(props: BookListProps) {
             `Failed to borrow book. Status: ${response.status}`,
         );
       }
-      props.refreshTrigger.value++; // Refresh book list
+      refreshTrigger.value++; // Refresh book list
     } catch (error) {
       console.error("Error borrowing book:", error);
       actionError.value = error instanceof Error
@@ -118,7 +117,7 @@ export default function BookList(props: BookListProps) {
             `Failed to return book. Status: ${response.status}`,
         );
       }
-      props.refreshTrigger.value++; // Refresh book list
+      refreshTrigger.value++; // Refresh book list
     } catch (error) {
       console.error("Error returning book:", error);
       actionError.value = error instanceof Error

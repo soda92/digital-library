@@ -92,7 +92,13 @@ async def get_current_user(
 
 
 # --- FastAPI App ---
-app = FastAPI(title="Digital Library JSON API", version="0.1.0")
+app = FastAPI(
+    title="Digital Library JSON API",
+    version="0.1.0",
+    root_path="/api",  # Inform FastAPI it's served under /api
+    # openapi_url="/openapi.json", # Default, will become /api/openapi.json
+    # docs_url="/docs",            # Default, will become /api/docs
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -357,6 +363,8 @@ def main():
         port=9000,  # Set the port to 9000
         reload=True,  # Enable auto-reload
         log_level="info", # Optional: for better logging
+        proxy_headers=True, # To correctly interpret X-Forwarded-Proto etc.
+        forwarded_allow_ips='*', # Or your Nginx server's IP if on a different machine
     )
 
 if __name__ == "__main__":
