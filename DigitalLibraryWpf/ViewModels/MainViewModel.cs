@@ -63,8 +63,8 @@ namespace DigitalLibraryWpf.ViewModels
             _bookManagementViewModel = new BookManagementViewModel(_apiService);
             
             ApplyServerUrlCommand = new RelayCommand(_ => _apiService.SetBaseUrl(ServerUrl), _ => !string.IsNullOrWhiteSpace(ServerUrl));
-            LogoutCommand = new RelayCommand(ExecuteLogout, () => IsLoggedIn);
-            LoginCommand = new RelayCommand(ExecuteShowLogin, () => !IsLoggedIn);
+            LogoutCommand = new RelayCommand(ExecuteLogout, (_) => IsLoggedIn);
+            LoginCommand = new RelayCommand(ExecuteShowLogin, (_) => !IsLoggedIn);
 
 
             // Initial state
@@ -100,14 +100,14 @@ namespace DigitalLibraryWpf.ViewModels
             Task.Run(async () => await _bookManagementViewModel.LoadBooksAsync());
         }
 
-        private void ExecuteLogout(object? parameter)
+        private void ExecuteLogout(object? _)
         {
             _apiService.Logout();
             IsLoggedIn = false; // This should also be set by OnAuthTokenChanged
             CurrentPageViewModel = _loginViewModel;
             _bookManagementViewModel.Books.Clear(); // Clear books on logout
         }
-        
+
         private void ExecuteShowLogin(object? parameter)
         {
             if (!IsLoggedIn) // Should always be true due to CanExecute

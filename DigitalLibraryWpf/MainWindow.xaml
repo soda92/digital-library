@@ -5,70 +5,55 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:DigitalLibraryWpf"
         xmlns:viewModels="clr-namespace:DigitalLibraryWpf.ViewModels"
+        xmlns:converters="clr-namespace:DigitalLibraryWpf.Converters"
         mc:Ignorable="d"
         Title="Digital Library Client" Height="650" Width="850" MinHeight="500" MinWidth="600">
-    <Window.DataContext>
+    <!--<Window.DataContext>
         <viewModels:MainViewModel/>
-    </Window.DataContext>
+    </Window.DataContext>-->
+    <!-- Top Bar: Server Configuration and Login/Logout -->
+    <Window.Resources>
+        <converters:BooleanToCommandMultiConverter x:Key="LoginLogoutCommandConverter"/>
+    </Window.Resources>
+
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Configuration -->
             <RowDefinition Height="Auto"/> <!-- Configuration and Login/Logout -->
             <RowDefinition Height="*"/>    <!-- Main Content Area -->
             <RowDefinition Height="Auto"/> <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <!-- Top Bar: Server Configuration and Login/Logout -->
-        <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5" Margin="0,0,0,10">
+        
+        <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5" Margin="0,0,0,5">
             <StackPanel Orientation="Vertical">
                 <GroupBox Header="API Configuration">
                     <StackPanel Orientation="Horizontal" Margin="5">
                         <TextBlock Text="Server URL (e.g., http://localhost:9000):" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" Width="250" Margin="0,0,10,0" VerticalAlignment="Center"/>
                         <Button Content="Apply URL" Command="{Binding ApplyServerUrlCommand}" Padding="5" VerticalAlignment="Center" Margin="0,0,20,0"/>
-                        
-                        <Button Content="{Binding LoginLogoutButtonText}" 
-                                Command="{Binding Path=IsLoggedIn, Converter={StaticResource BooleanToCommandConverter}, ConverterParameter={StaticResource LoginLogoutCommands}}"
-                                Padding="10,5" VerticalAlignment="Center" MinWidth="80"/>
-                        <!-- The BooleanToCommandConverter and LoginLogoutCommands would be more complex.
-                             Simpler approach: Two buttons with visibility binding, or one button whose command changes.
-                             For simplicity, let's use two buttons with visibility.
-                        -->
                     </StackPanel>
                 </GroupBox>
-                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,5,0">
-                     <Button Content="Login" Command="{Binding LoginCommand}" Padding="10,5" Margin="0,0,5,0">
-                         <Button.Style>
-                             <Style TargetType="Button">
-                                 <Setter Property="Visibility" Value="Collapsed"/>
-                                 <Style.Triggers>
-                                     <DataTrigger Binding="{Binding IsLoggedIn}" Value="False">
-                                         <Setter Property="Visibility" Value="Visible"/>
-                                     </DataTrigger>
-                                 </Style.Triggers>
-                             </Style>
-                         </Button.Style>
-                     </Button>
-                     <Button Content="Logout" Command="{Binding LogoutCommand}" Padding="10,5">
-                         <Button.Style>
-                             <Style TargetType="Button">
-                                 <Setter Property="Visibility" Value="Collapsed"/>
-                                 <Style.Triggers>
-                                     <DataTrigger Binding="{Binding IsLoggedIn}" Value="True">
-                                         <Setter Property="Visibility" Value="Visible"/>
-                                     </DataTrigger>
-                                 </Style.Triggers>
-                             </Style>
-                         </Button.Style>
-                     </Button>
-                 </StackPanel>
             </StackPanel>
         </Border>
         
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,10">
+            <Button Content="{Binding LoginLogoutButtonText}" Padding="10,5" VerticalAlignment="Center" MinWidth="80">
+                <Button.Command>
+                    <MultiBinding Converter="{StaticResource LoginLogoutCommandConverter}">
+                        <Binding Path="IsLoggedIn"/>       <!-- values[0] -->
+                        <Binding Path="LoginCommand"/>      <!-- values[1] (command if IsLoggedIn is False) -->
+                        <Binding Path="LogoutCommand"/>     <!-- values[2] (command if IsLoggedIn is True) -->
+                    </MultiBinding>
+                </Button.Command>
+            </Button>
+        </StackPanel>
+
         <!-- Main Content Area -->
-        <ContentControl Grid.Row="1" Content="{Binding CurrentPageViewModel}" Margin="0,5,0,5"/>
+        <ContentControl Grid.Row="2" Content="{Binding CurrentPageViewModel}" Margin="0,0,0,5"/>
 
         <!-- Status Bar (Optional) -->
-        <StatusBar Grid.Row="2">
+        <StatusBar Grid.Row="3">
             <StatusBarItem>
                 <TextBlock>
                     <TextBlock.Style>
